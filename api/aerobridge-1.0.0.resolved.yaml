@@ -1,0 +1,2176 @@
+---
+openapi: "3.0.2"
+info:
+  title: "Aerobridge Server API specification"
+  description: |-
+    All the interfaces for the Aerobridge server are defined here, using these APIs, you can interact with management server, store flight plans, issue flight permissions. We recommend using a authorised GCS e.g. Aerobridge Guardian with Aerobridge management server. 
+
+    The API is a limited subset of all the functionality of the Management server and focuses on interactions with GCS / external software. Aerobridge server also provides a user interface as well and this API works in conjunction with that user interace. 
+
+    Unless otherwise specified, fields specified in a message but not declared in the API shall be ignored.
+
+  version: "1.6.0"
+servers:
+  - url: "https://virtserver.swaggerhub.com/cygnus2936/aerobridge/1.0.0"
+    description: "Aerobridge Server API"
+security:
+  - AuthFromPassport:
+      - "aerobridge.write"
+      - "aerobridge.read"
+      - "aerobridge.privileged"
+
+paths:
+  /ping:
+    get:
+      summary: "Server heartbeat operation"
+      description: "This operation is a ping to check if the server is running"
+      security: []
+      responses:
+        "200":
+          description: "pong"
+
+  /pki/credentials/:
+    get:
+      summary: "List all stored credentials "
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: listCredentials
+      description: List all credentials stored in the server. Aerobridge stores credentials securely and this API decrypts them on the fly.
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AerobridgeCredential"
+          description: "List of all credentials stored"
+      tags:
+        - Credentials
+    post:
+      summary: "Create a new credential"
+      security:
+        - AuthFromPassport: [aerobridge.write]
+
+      operationId: createCredentials
+      description: Create a new credential object and store it securely on the management server.
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AerobridgeCredential"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/AerobridgeCredential"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/AerobridgeCredential"
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AerobridgeCredential"
+          description: "Credentials successfully retrieved"
+      tags:
+        - Credentials
+
+  /pki/credentials/{id}:
+    get:
+      summary: "Get details of a single credential"
+      security:
+        - AuthFromPassport: [aerobridge.read]
+
+      operationId: retrieveCredentials
+      description: Retrieve or delete a credential instance.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: A UUID string identifying this credential.
+          schema:
+            $ref: '#/components/schemas/UUIDv4Format'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AerobridgeCredential"
+          description: ""
+      tags:
+        - Credentials
+    delete:
+      summary: "Delete credential details"
+      security:
+        - AuthFromPassport: [aerobridge.write]
+
+      operationId: deleteCredentials
+      description: Delete a Credentials instance.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: A UUID string identifying this credential.          
+          schema:
+            $ref: '#/components/schemas/UUIDv4Format'
+
+      responses:
+        "200":
+          description: Deleted
+        "404":
+          description: Credential ID not found
+        "401":
+          description: Unauthorized
+
+      tags:
+        - Credentials
+
+  /pki/auth_server_fullchain:
+    get:
+      summary: "Full chain certificates of the Auth Server"
+      operationId: listAuthServerFullChain
+      description: "Get a list of all Auth Server Full Chain certifiactes stored in Aerobridge, used in Trusted Flight"
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AerobridgeRemoteCredential"
+          description: "Successfully retrieved Remote Credential"
+      tags:
+        - Credentials
+  /gcs/firmware:
+    get:
+      summary: "A list of all Firmware releases stored in the Aerobridge management server"
+      operationId: listFirmwares
+      description: "Get a list of all Firmware stored in Aerobridge"
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Firmware"
+          description: "Successfully retrieved firmwares stored"
+      tags:
+        - Firmware
+    put:
+      summary: "Add a new firmware release"
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: createFirmware
+      description: "Update the server with a new Firmware version and its details"
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Firmware"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Firmware"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Firmware"
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Firmware"
+          description: ""
+      tags:
+        - Firmware
+
+  /gcs/firmware/{firmware_id}:
+    get:
+      summary: "Get a details of a single firmware release"
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: retrieveFirmware
+      description: "Get a specific firmware by id"
+      parameters:
+        - name: firmware_id
+          in: path
+          required: true
+          description: ""
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Firmware"
+          description: "Firmware details successfully retrieved"
+      tags:
+        - Firmware
+
+  /gcs/flight-plans:
+    get:
+      operationId: listFlightPlans
+      summary: Get all Flight Plans
+      description: "Get a list of all Flight Plans Aerobridge"
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FlightPlanList"
+          description: "All flight plans retrieved"
+      tags:
+        - Flight Plans
+    post:
+      operationId: createFlightPlan
+      summary: Create new Flight Plan
+      description: "Upload a new flight plan from QGCS in Aerobridge, a GeoJSON is automatically created once a Plan File is uploaded"
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlightPlanCreateUpdate"
+
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightPlan"
+          description: "Flight Plan successfully created"
+      tags:
+        - Flight Plans
+
+  /gcs/flight-plans/{flightplan_id}:
+    get:
+      operationId: retrieveFlightPlan
+      summary: Get Single Flight Plan
+      description: "Get details of a single plan"
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      parameters:
+        - name: flightplan_id
+          in: path
+          required: true
+          description: "ID of the Flight Plan in Aerobridge"
+          schema:
+            type: string
+
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightPlan"
+          description: "Flight Plan retrieved successfullly"
+      tags:
+        - Flight Plans
+
+    put:
+      operationId: updateFlightPlan
+      summary: Update details of a Flight Plan
+      description: "Update existing flight plan with a new KML"
+      security:
+        - AuthFromPassport: [aerobridge.write]
+      parameters:
+        - name: flightplan_id
+          in: path
+          required: true
+          description: "ID of the Flight Plan in Aerobridge"
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlightPlanCreateUpdate"
+
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightPlan"
+          description: "Flight Plan updated"
+      tags:
+        - Flight Plans
+
+  /gcs/flight-operations:
+    get:
+      operationId: listFlightOperations
+      summary: List all Flight Operations
+      description: "Get all Flight Operations in Aerobridge"
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightOperationList"
+          description: "Operations retrieved successfully"
+      tags:
+        - Flight Operations
+    post:
+      operationId: updateFlightOperation
+      summary: Create a new operation via the GCS
+      description: "Create a new Flight Operation"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlightOperation"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/FlightOperation"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/FlightOperation"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightOperation"
+          description: "New Flight Operation created"
+
+      tags:
+        - Flight Operations
+
+  /gcs/flight-operations/{flightoperation_id}:
+    get:
+      operationId: retrieveFlightOperation
+      summary: Get a single Flight Operation
+      description: "Use this endpont to retrieve details of a signle flight operation"
+      parameters:
+        - name: flightoperation_id
+          in: path
+          required: true
+          description: ""
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightOperation"
+          description: "Operation retrieved successfully"
+      tags:
+        - Flight Operations
+
+  /gcs/flight-operations/{operation_id}/permission:
+    put:
+      summary: Get or Create a Permission for this Operation
+      operationId: getOrCreateOperationPermission
+      description: "Generate a permission object for an operation, once a flight operation is created, a permission is automatically generated, you can use this endpoint to generate it manually"
+      security:
+        - AuthFromPassport: [aerobridge.privileged]
+      parameters:
+        - name: operation_id
+          in: path
+          required: true
+          description: A UUID string identifying this flight operation.
+          schema:
+            $ref: '#/components/schemas/UUIDv4Format'
+            
+
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/FlightPermissionGranted'
+                  - $ref: '#/components/schemas/FlightPermissionDenied'
+                  - $ref: '#/components/schemas/FlightPermissionPending'
+
+          description: "Flight permission object status successfully created / retrieved"
+
+        "400":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Error in processing your request"
+
+          description: "Error in processing your request"
+      tags:
+        - Flight Operations
+
+  /gcs/flight-logs:
+    get:
+      summary: List all Flight Logs
+      operationId: listFlightLogs
+      description: "List of all raw logs flight logs stored in Aerobridge"
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FlightLog"
+          description: "Successfully retrieved all flight logs"
+      tags:
+        - Flight Logs
+    post:
+      operationId: createFlightLog
+      summary: Create a new Flight Log
+      description: "Upload a new flight log object, you can upload a flight log file using this endpoint"
+      security:
+        - AuthFromPassport: [aerobridge.write]
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlightLog"
+
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightLog"
+          description: "Successfully created a new flight log object"
+      tags:
+        - Flight Logs
+
+  /gcs/flight-logs/{flightlog_id}:
+    get:
+      operationId: retrieveFlightLog
+      summary: Get a single Flight Log
+      description: ""
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      parameters:
+        - name: flightlog_id
+          in: path
+          required: true
+          description: "ID of the "
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightLog"
+          description: "Successfully retrieved new flight log object"
+      tags:
+        - Flight Logs
+    put:
+      operationId: updateFlightLog
+      summary: Update a Flight Log
+      description: ""
+      security:
+        - AuthFromPassport: [aerobridge.write]
+      parameters:
+        - name: flightlog_id
+          in: path
+          required: true
+          description: "ID of the flight log to be updated"
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlightLog"
+
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightLog"
+          description: "Successfully updated flight log"
+      tags:
+        - Flight Logs
+    delete:
+      operationId: destroyFlightLog
+      summary: Remove Flight Log
+      description: "Remove flight log object from Aerobridge"
+      security:
+        - AuthFromPassport: [aerobridge.write]
+      parameters:
+        - name: flightlog_id
+          in: path
+          required: true
+          description: ""
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "Flight log deleted successfully"
+      tags:
+        - Flight Logs
+
+  /gcs/flight-logs/{id}/sign:
+    put:
+      operationId: Sign a Flight Log
+      description: "Sign a Flight Log, a hash of the log is created and the hash signed and the log is updated"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: "ID of the raw log object"
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedFlightLog"
+          description: "Flight Log signed successfully"
+        "404":
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+          description: "A Flight Log object was not found"
+        "409":
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+          description: "The Flight Log has already been signed"
+      tags:
+        - Flight Logs
+
+  /gcs/signed-flight-logs:
+    get:
+      operationId: List all Signed logs
+      description: "A list of all signed logs on the server"
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SignedFlightLog"
+          description: "Signed flight log details successfully retrieved"
+      tags:
+        - Signed Flight Logs
+  /gcs/signed-flight-logs/{id}:
+    get:
+      operationId: Get single flight log
+      description: "Retrieve the details of a single flight log"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: A UUID string identifying this signed flight log.
+          schema:
+            $ref: '#/components/schemas/UUIDv4Format'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedFlightLog"
+          description: "Signed flight log details successfully retrieved"
+      tags:
+        - Signed Flight Logs
+  /gcs/files:
+    get:
+      summary: "A list of all uploaded files"
+      operationId: listCloudFiles
+      description: "Get a list of all Files stored in the cloud via Aerobridge, you can configure multiple S3 like cloud providers to host your files securely on the cloud."
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CloudFile"
+          description: "Successfully retrieved all cloud files"
+      tags:
+        - Files
+
+  /gcs/files/{file_id}:
+    get:
+      summary: "Get a single file details"
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: retrieveCloudFile
+      description: "Get a specific file details by id"
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          description: "A UUID of the uploaded file object"
+          schema:
+            $ref: '#/components/schemas/UUIDv4Format'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudFile"
+          description: "Successfully retrieved a single cloud file"
+      tags:
+        - Files
+
+  /gcs/files/documents/upload:
+    put:
+      summary: "Upload a single document"
+      security:
+        - AuthFromPassport: [aerobridge.write]
+      operationId: createCloudFileDocument
+      description: "Upload a document to Aerobridge, use this endpoint to upload PDFs, certificates etc."
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                # 'file' will be the field name in this multipart request
+                file:
+                  type: string
+                  format: binary
+
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudFile"
+          description: ""
+      tags:
+        - Files
+
+  /gcs/files/photos/upload:
+    put:
+      summary: "Upload a single photo"
+      security:
+        - AuthFromPassport: [aerobridge.write]
+      operationId: createCloudFileDocument
+      description: "Upload a photo to Aerobridge, use this endpoint to upload jpgs, photos, scans etc."
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                # 'file' will be the field name in this multipart request
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudFile"
+          description: "Cloud file successfully created"
+      tags:
+        - Files
+
+  /gcs/flight-permissions:
+    get:
+      summary: "Get all flight permissions"
+      description: "Use this endpoint to retrieve all flight permission objects to be processed in the GCS"
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: listFlightPermissions
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FlightPermissionGranted"
+          description: "Flight Permission successfully retrieved"
+      tags:
+        - Flight Permissions
+  /gcs/flight-permissions/{id}:
+    get:
+      summary: "Get a single permission"
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      description: "Use this endpoint to retrieve permissionging details for a single flight"
+
+      operationId: retrieveFlightPermission
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: A UUID string identifying this flight permission.
+          schema:
+            $ref: '#/components/schemas/UUIDv4Format'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/FlightPermissionGranted'
+                  - $ref: '#/components/schemas/FlightPermissionDenied'
+                  - $ref: '#/components/schemas/FlightPermissionPending'
+          description: "Flight Permission object successfully retrieved"
+      tags:
+        - Flight Permissions
+
+  /registry/aircraft/:
+    get:
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: Get all Aircrafts
+      description: List all aircrafts in the database
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Aircraft"
+          description: "Aircraft details successfully retrieved"
+      tags:
+        - Aircrafts
+
+  /registry/aircraft/{id}:
+    get:
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: Get Single Aircraft
+      description: Retrieve details of a Aircraft instance.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: A UUID string identifying this aircraft.
+          schema:
+            $ref: '#/components/schemas/UUIDv4Format'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Aircraft"
+          description: "Single aircraft details successfully retrieved"
+      tags:
+        - Aircrafts
+
+  /registry/aircraft/rfm/{flight_controller_id}:
+    get:
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: Get Single Aircraft (RFM ID)
+      description: Retrieve details of a Aircraft instance using the RFM ID.
+      parameters:
+        - name: flight_controller_id
+          in: path
+          required: true
+          description: A flight controller id that is linked to this aircraft.
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Aircraft"
+          description: "Aircraft details successfully retireved"
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Aircraft"
+          description: "Aircraft details could not be found"
+      tags:
+        - Aircrafts
+        
+  /registry/aircraft/firmware/{flight_controller_id}:
+    get:
+      operationId: Get Aircraft firmware by RFM ID
+      description: Retrieve, update or delete a Aircraft Firmware instance.
+      parameters:
+      - name: flight_controller_id
+        in: path
+        required: true
+        description: This is the Drone ID from the RFM, if there are spaces in the
+          ID, remove them
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Firmware'
+          description: ''
+      tags:
+      - Aircrafts
+  /registry/operators/:
+    get:
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: Get all Operators
+      description: List all operators in Aerobridge
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Operator"
+          description: "Successfully retrieved all operators"
+      tags:
+        - Operator
+  /registry/operators/{id}:
+    get:
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: Get single Operator
+      description: Get details of a single operator in Aerobridge
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: A UUID string identifying this operator.
+          schema:
+            $ref: '#/components/schemas/UUIDv4Format'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operator"
+          description: "Successfully retrieved single operator details"
+      tags:
+        - Operator
+  /registry/manufacturers/:
+    get:
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: List all Manufacturers
+      description: List all manufacturers in Aerobridge.
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Manufacturer"
+          description: "Successfully retrieved all manufacturers"
+      tags:
+        - Manufacturer
+  /registry/manufacturers/{id}:
+    get:
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: Get Single Manufacturer
+      description: Retrieve details of a single Manufacturer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: A UUID string identifying this manufacturer.
+          schema:
+            $ref: '#/components/schemas/UUIDv4Format'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Manufacturer"
+          description: "Successfully retrieved manufacturer details"
+      tags:
+        - Manufacturer
+
+
+  /registry/aircraft-component/{aerobrige_id}:
+    get:
+      operationId: verifyAerobridgeID
+      summary: Verify authenticity of a component
+      description: "Use this endpoint to verify if a Component ID is valid within the company "
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      
+      parameters:
+      - name: aerobridge_id
+        in: path
+        required: true
+        description: A UUID string identifying this pilot.
+        schema:
+          $ref: '#/components/schemas/AerobridgeID'
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComponentVerificationStatus"
+          description: "Status of whether the Aerobridge ID provided is valid"
+      tags:
+        - Aircraft Components
+
+
+
+  /registry/pilots/:
+    get:
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: listPilots
+      description: List all pilots in the database, a pilot is 
+      summary: List all Pilots
+      parameters: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pilot'
+          description: 'All Pilots successfully retrieved'
+      tags:
+      - Pilot
+  /registry/pilots/{id}:
+    get:
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: retrievePilot
+      description: Retrieve, update or delete a Pilot instance.
+      summary: Get details of a single pilot
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: A UUID string identifying this pilot.
+        schema:
+          $ref: '#/components/schemas/UUIDv4Format'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pilot'
+          description: 'Details of a single pilot retrieved successfully'
+      tags:
+      - Pilot
+
+  /registry/activities/:
+    get:
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: listActivitys
+      summary: Get all activities in the registry
+      description: List all activities in the database
+      parameters: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Activity'
+          description: 'All activities retrieved successfully'
+      tags:
+      - Activitiy
+  /registry/activities/{id}:
+    get:
+      security:
+        - AuthFromPassport: [aerobridge.read]
+      operationId: retrieveActivity
+      summary: Get details of a single activity
+      description: Retrieve, update or delete a Activity instance.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: A UUID string identifying this activity.
+        schema:
+          $ref: '#/components/schemas/UUIDv4Format'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Activity'
+          description: 'Activity Details successfully retrieved'
+      tags:
+      - Activitiy
+      
+
+tags:
+  - name: Files
+    description: "Aerobridge provides functionality to upload files such as logs, id documents etc. to your favourite cloud provider, use these endpoints to manage thse files, you will have to configure the cloud provider during instalation / configuration of Aerobridge"
+  - name: Manufacturer
+    description: "Aerobridge stores details of aircraft manufacturers. Manufacturers are linked to aircraft and control release of firmware"
+  - name: Operator
+    description: "Operators have a very specific definition in the context of drone operations. Usually they are enties who fly and operate a drone, use these endpoints to identify and query operators stored in Aerobridge"
+  - name: Aircrafts
+    description: "All endpoints related to Aircraft objects stored in Aerobridge, we recommend that you use the frontend to create a new Aircraft and associate extended details with the aircraft"
+  - name: Aircraft Components
+    description: "All endpoints related to Aircraft component objects stored in Aerobridge"
+  # - name: Digital Sky
+  #   description: "Aerobridge can communicate with Digital Sky and all endpoints related to Digital Sky are here. As of September-2021 Digital Sky is changing and some commands and endpoints are not supported."
+  - name: Flight Permissions
+    description: "Flight Permissions are issued by the Guardian system and you can use these endpoints to download permission objects."
+  - name: Signed Flight Logs
+    description: "Flights logs can be signed on the management server use these enpoints to interact with the flight logs signed on the server"
+  - name: Flight Logs
+    description: "After the mission is complete use these endpoints to upload flight logs to the management server."
+  - name: Flight Operations
+    description: "Flight Operations depend on flight plans and specify details about operation that will enable the drone to fly the plan. Use these endpoints to interact with operations stored in the management server. Permissions are issued against Flight Operation objects."
+  - name: Flight Plans
+    description: "Flight plans are .plan files from GCS that can be stored in the server, usually flight plans are generated on the GCS and popular GCS like QGCS and MissionPlanner support them. An operation is created against the plan and permission artefacts retrieved for the operation. A plan can be reused for multiple operations."
+  - name: Firmware
+    description: "Manufacturer can sign and release firmwares and these endpoints help in downloading the latest firmware to the GCS and / or check if the firmware is the latest one"
+  - name: Credentials
+    description: "Aerobridge server can store credentials securely on the server, use these endpoints to store public and private keys and retrieve the associated details with the credentials. Read the documentation for more details."
+
+components:
+  securitySchemes:
+    AuthFromPassport:
+      description: |-
+        Openskies provides a open-source OAUTH server: [https://id.openskies.sh](https://id.openskies.sh), it or any OAUTH 2.0 server that can issue JWT tokens can be used to conrol acceess. Access is controlled via access tokens that are JSON Web Tokens as defined in RFC 7519, using the `RS256` algorithm for the signature, publish to all providers the public key for verifying that signature, and implement standard OAuth server discovery mechanisms as described in RFC 8414.
+
+        The following fields shall be included in the JWT claim for access tokens issued by this authority:
+            * `iss`, with the URL at which the token generation request was received.
+            * `exp`, with a time no further than 1 hour in the future.
+            * `sub`, with unique ID of the client requesting the access token.
+            * `scope`, with a list of space-separated strings (per RFC 6749) indicating the scopes granted.
+            * `jti`, according to RFC 7519.
+
+        Clients shall provide these access tokens in an `Authorization` header in the form `Bearer <token>` in accordance with RFC 6750.
+
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: "http://id.openskies.sh/oauth/token/"
+          scopes:
+            aerobridge.write: "Write data into Aerobridge"
+            aerobridge.read: "Read data from Aerobridge"
+
+  schemas:    
+    Pilot:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        operator:
+          type: string
+          description: Assign this pilot to a operator
+        person:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              readOnly: true
+            first_name:
+              type: string
+              description: The first name of the person added to the database
+              maxLength: 30
+            middle_name:
+              type: string
+              nullable: true
+              maxLength: 30
+            last_name:
+              type: string
+              maxLength: 30
+            email:
+              type: string
+              format: email
+              description: Associate a email address with the person, this field is
+                required
+              maxLength: 254
+            created_at:
+              type: string
+              format: date-time
+              readOnly: true
+            updated_at:
+              type: string
+              format: date-time
+              readOnly: true
+          required:
+          - first_name
+          - last_name
+          - email
+          readOnly: true
+        photo:
+          type: string
+          format: uri
+          nullable: true
+          description: A URL to link to a photo of the pilot
+          maxLength: 200
+          pattern: "^(?:[a-z0-9.+-]*)://(?:[^\\s:@/]+(?::[^\\s:@/]*)?@)?(?:(?:0|25[0-5]|2[0-4]\\\
+            d|1\\d?\\d?|[1-9]\\d?)(?:\\.(?:0|25[0-5]|2[0-4]\\d|1\\d?\\d?|[1-9]\\d?)){3}|\\\
+            [[0-9a-f:.]+\\]|([a-z\xA1-\uFFFF0-9](?:[a-z\xA1-\uFFFF0-9-]{0,61}[a-z\xA1\
+            -\uFFFF0-9])?(?:\\.(?!-)[a-z\xA1-\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\xA1\
+            -\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\.?|localhost))(?::\\d{1,5})?(?:[/?#][^\\\
+            s]*)?\\z"
+        address:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              readOnly: true
+            address_line_1:
+              type: string
+              maxLength: 140
+            address_line_2:
+              type: string
+              nullable: true
+              maxLength: 140
+            address_line_3:
+              type: string
+              nullable: true
+              maxLength: 140
+            postcode:
+              type: string
+              maxLength: 10
+            city:
+              type: string
+              description: Set a city for this address
+              maxLength: 140
+            country:
+              enum:
+              - IN
+              type: string
+            created_at:
+              type: string
+              format: date-time
+              readOnly: true
+            updated_at:
+              type: string
+              format: date-time
+              readOnly: true
+          required:
+          - address_line_1
+          - postcode
+          - city
+          readOnly: true
+        is_active:
+          type: boolean
+          description: Is this pilot active? If he is not working for the company
+            or has moved on, set it as inactive        
+        tests:
+          type: string
+          readOnly: true
+      required:
+      - operator
+    Activity:
+      type: object
+      properties:
+        id:        
+          $ref: '#/components/schemas/UUIDv4Format'
+          readOnly: true
+        name:
+          type: string
+          description: Set a name for this activity
+          maxLength: 140
+          example: Videotaping
+        activity_type:
+          enum:
+          - 0
+          - 1
+          - 2
+          type: integer
+          description: >
+            Set the activity type and the airspace
+             * `0` - NA
+             * `1` - Open
+             * `2` - Specific
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - name
+
+
+    Operator:
+      type: object
+      properties:
+        id:        
+          $ref: '#/components/schemas/UUIDv4Format'
+          readOnly: true
+        company_name:
+          type: string
+          maxLength: 280
+        website:
+          type: string
+          format: uri
+          maxLength: 200
+          pattern:
+            "^(?:[a-z0-9.+-]*)://(?:[^\\s:@/]+(?::[^\\s:@/]*)?@)?(?:(?:25[0-5]|2[0-4]\\\
+            d|[0-1]?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|[0-1]?\\d?\\d)){3}|\\[[0-9a-f:.]+\\\
+            ]|([a-z\xA1-\uFFFF0-9](?:[a-z\xA1-\uFFFF0-9-]{0,61}[a-z\xA1-\uFFFF0-9])?(?:\\\
+            .(?!-)[a-z\xA1-\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\xA1-\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\\
+            .?|localhost))(?::\\d{2,5})?(?:[/?#][^\\s]*)?\\z"
+          example: https://raw.githubusercontent.com/openskies-sh
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        phone_number:
+          type: string
+          pattern: ^\+?1?\d{9,15}$
+          maxLength: 17
+        expiration:
+          type: string
+          format: date-time
+          example: "2021-09-24T13:53:14"
+        operator_type:
+          enum:
+            - 0
+            - 1
+            - 2
+            - 3
+            - 4
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: "2021-09-24T13:53:14"
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          example: "2021-09-24T13:53:14"
+        vat_number:
+          type: string
+          nullable: true
+          maxLength: 25
+          example: "CE1558433548"
+        insurance_number:
+          type: string
+          nullable: true
+          maxLength: 25
+          example: "CDDFEF23DW"
+        company_number:
+          type: string
+          nullable: true
+          maxLength: 25
+          example: "3934304933"
+        country:
+          enum:
+            - IN
+          type: string
+        address:
+          type: object
+          properties:
+            id:
+              $ref: '#/components/schemas/UUIDv4Format'
+              readOnly: true
+            address_line_1:
+              type: string
+              maxLength: 140
+            address_line_2:
+              type: string
+              nullable: true
+              maxLength: 140
+            address_line_3:
+              type: string
+              nullable: true
+              maxLength: 140
+            postcode:
+              type: string
+              maxLength: 10
+            city:
+              type: string
+              maxLength: 140
+            country:
+              enum:
+                - IN
+              type: string
+            created_at:
+              type: string
+              format: date-time
+              readOnly: true
+            updated_at:
+              type: string
+              format: date-time
+              readOnly: true
+        operational_authorizations:
+          type: array
+          items:
+            type: string
+          example: ["SORA"]
+        authorized_activities:
+          type: array
+          items:
+            type: string
+          example: ["Videotaping"]
+      required:
+        - company_name
+        - website
+        - email
+        - address
+        - operational_authorizations
+        - authorized_activities
+
+    AerobridgeRemoteCredential:
+      type: object
+      properties:
+        name:
+          type: string
+          description:
+            Enter a friendly name / description for the type of credential
+            you are storing
+          pattern: ^[-, ,_\w]*$
+          maxLength: 100
+          
+        binary_file_url:
+          type: string
+          format: uri
+          maxLength: 200
+          pattern:
+            "^(?:[a-z0-9.+-]*)://(?:[^\\s:@/]+(?::[^\\s:@/]*)?@)?(?:(?:25[0-5]|2[0-4]\\\
+            d|[0-1]?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|[0-1]?\\d?\\d)){3}|\\[[0-9a-f:.]+\\\
+            ]|([a-z\xA1-\uFFFF0-9](?:[a-z\xA1-\uFFFF0-9-]{0,61}[a-z\xA1-\uFFFF0-9])?(?:\\\
+            .(?!-)[a-z\xA1-\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\xA1-\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\\
+            .?|localhost))(?::\\d{2,5})?(?:[/?#][^\\s]*)?\\z"
+          description: The Files API provides ways to generate a URL to upload your files
+        id:        
+          $ref: '#/components/schemas/UUIDv4Format'
+          readOnly: true
+          example: 5d84afc6-47e1-4b92-ad9e-541b8ebc54b1
+      required:
+        - name
+        - binary_file_url
+        - id
+    AerobridgeCredential:
+      type: object
+      properties:
+        token:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          description:
+            Enter a friendly name / description for the type of credential
+            you are storing
+          pattern: ^[-, ,_\w]*$
+          maxLength: 100
+        extension:
+          enum:
+            - 0
+            - 1
+          type: integer
+          example: 3
+          description: >
+            The type of data that can be stored is the following: 
+             * `0` - Other
+             * `1` - jwk
+        token_type:
+          enum:
+            - 0
+            - 1
+            - 2
+          example: 0
+          description: >
+            Specify the type of data stored:
+             * `0` - Public Key
+             * `1` - x509 Digital Certificate
+             * `2` - Other
+        association:
+          enum:
+            - 0
+            - 1
+            - 2
+            - 3
+            - 4
+          description: >
+            Set the entity this credential is associated with. The association will be used when calling other external servers:
+             * `0` - Operator
+             * `1` - Manufacturer
+             * `2` - Pilot
+             * `3` - RFM
+             * `4` - Company
+          type: integer
+        is_active:
+          type: boolean
+          description: Set whether the credential is still active
+        id:        
+          $ref: '#/components/schemas/UUIDv4Format'
+          readOnly: true
+          example: 5d84afc6-47e1-4b92-ad9e-541b8ebc54b1
+        aircraft:
+          $ref: '#/components/schemas/UUIDv4Format'
+          nullable: true
+          description: A UUID of the aircraft in the system that is associated with this token, optional
+          example: 846ddb6c-2fcf-4617-8f3b-b6dcf86ceeb0
+        manufacturer:
+          $ref: '#/components/schemas/UUIDv4Format'
+          nullable: true
+          description: A UUID of the manufacturer in the system that is associated with this token, optional
+          example: 94fa5ad6-e82e-4f65-be93-07b62fb89195
+        operator:
+          $ref: '#/components/schemas/UUIDv4Format'
+          nullable: true
+          description: A UUID of the operator in the system that is associated with this token, optional
+          example: edcbafed-edc7-47bb-96ee-5ed972bb977c
+      required:
+        - name
+    Firmware:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUIDv4Format'
+          readOnly: true
+        binary_file_url:
+          type: string
+          format: uri
+          maxLength: 200
+          pattern:
+            "^(?:[a-z0-9.+-]*)://(?:[^\\s:@/]+(?::[^\\s:@/]*)?@)?(?:(?:25[0-5]|2[0-4]\\\
+            d|[0-1]?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|[0-1]?\\d?\\d)){3}|\\[[0-9a-f:.]+\\\
+            ]|([a-z\xA1-\uFFFF0-9](?:[a-z\xA1-\uFFFF0-9-]{0,61}[a-z\xA1-\uFFFF0-9])?(?:\\\
+            .(?!-)[a-z\xA1-\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\xA1-\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\\
+            .?|localhost))(?::\\d{2,5})?(?:[/?#][^\\s]*)?\\z"
+          description: The Files API provides ways to generate a URL to upload your files
+        binary_file_hash:
+          type: string
+          description: The CRC or SHA-256 hash for the firmware
+        version:
+          type: string
+          maxLength: 25
+          description: It is recommended that you maintain major and minor version consistent with the Semver (https://semver.org/) spec
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+        - binary_file_url
+        - binary_file_hash
+        - version
+    CloudFile:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUIDv4Format'
+          readOnly: true
+        location:
+          type: string
+          format: uri
+          maxLength: 200
+          pattern:
+            "^(?:[a-z0-9.+-]*)://(?:[^\\s:@/]+(?::[^\\s:@/]*)?@)?(?:(?:25[0-5]|2[0-4]\\\
+            d|[0-1]?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|[0-1]?\\d?\\d)){3}|\\[[0-9a-f:.]+\\\
+            ]|([a-z\xA1-\uFFFF0-9](?:[a-z\xA1-\uFFFF0-9-]{0,61}[a-z\xA1-\uFFFF0-9])?(?:\\\
+            .(?!-)[a-z\xA1-\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\xA1-\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\\
+            .?|localhost))(?::\\d{2,5})?(?:[/?#][^\\s]*)?\\z"
+        name:
+          type: string
+          example: "uin_certificate.pdf"
+        upload_type:
+          enum:
+            - logs
+            - documents
+            - other
+          type: string
+          example: documents
+          description: Specify the type of document that is being uploaded
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+        - location
+        - name
+    FlightPlanCreateUpdate:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUIDv4Format'
+          readOnly: true
+        name:
+          type: string
+          description: Give this flight plan a friendly name
+          maxLength: 140
+          example: North West Medical Delivery
+        plan_file_json:
+          type: object
+          description: 'Paste the QGCS flight plan JSON, for more information about
+            the Plan File Format see: https://dev.qgroundcontrol.com/master/en/file_formats/plan.html'          
+        is_editable:
+          type: boolean
+          description:
+            Set whether the flight plan can be edited. Once the flight log has been signed a flight plan cannot be edited.
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+        - plan_file_json
+        - name
+
+    FlightPlan:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUIDv4Format'
+          readOnly: true
+        name:
+          type: string
+          maxLength: 30
+          example: North West Medical Delivery
+        plan_file_json:
+          type: object
+          description: 'Paste the QGCS flight plan JSON, for more information about
+            the Plan File Format see: https://dev.qgroundcontrol.com/master/en/file_formats/plan.html'      
+        geo_json: 
+          type: object
+          $ref: '#/components/schemas/GeoJSON'
+          nullable: true
+          description: Flight plan geometry as GeoJSON, Aerobridge converts the plan file in to GeoJSON automatically so that it can be displayed on a map. 
+        is_editable:
+          type: boolean
+          description:
+            Set whether the flight plan can be edited. Once the flight log has been signed a flight plan cannot be edited. 
+          readOnly: true
+          
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+        - plan_file_json
+        - name
+
+    FlightPlanList:
+      type: array
+      items:
+        $ref: "#/components/schemas/FlightPlan"
+
+    FlightOperationList:
+      type: array
+      items:
+        $ref: "#/components/schemas/FlightOperation"
+
+    FlightOperation:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUIDv4Format'
+          readOnly: true
+          example: 78bd066a-f8d4-4c4d-b45c-53f2aa53ee8c
+        name:
+          type: string
+          description: Give a friendly name for this operation e.g. Medical Deliery Operation
+          maxLength: 140
+        start_datetime:
+          type: string
+          format: date-time
+        end_datetime:
+          type: string
+          format: date-time
+        type_of_operation:
+          enum:
+            - 0
+            - 1
+          type: integer
+          description: Specify if the operation is VLOS or BVLOS.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        drone:        
+          description: Pick the drone that will be used to fly this opreation, a drone has to be active and registered in Aerobridge.
+          $ref: '#/components/schemas/UUIDv4Format'
+          example: 01e27e8a-351c-4fa9-83b1-f243c6595e88
+        operator:
+          $ref: '#/components/schemas/UUIDv4Format'          
+          description: Assign a operator for this operation, you may use multiple companies in Aerobridge, assign the appropriate operator          
+          example: 0adaf595-9267-4ddc-8d77-58bbafae79d0
+        flight_plan:
+          $ref: '#/components/schemas/UUIDv4Format' 
+          description: A operation must have a flight plan associated with it
+          example: 15e1e37d-abe1-42b7-a7d4-a05ae2eb21d4
+        purpose:
+          $ref: '#/components/schemas/UUIDv4Format'           
+          description: By default the purpose of the operation is related to authorized activities table          
+          example: 57f92cc6-f1fb-42d0-a19d-f777c31eb44e
+        pilot:
+          $ref: '#/components/schemas/UUIDv4Format' 
+          example: 5178fd83-34bf-4721-bc53-291b0e6f05f8
+          description: Assign a pilot for this operation
+      required:
+        - drone
+        - flight_plan
+        - pilot
+        - operator
+        - purpose
+        - start_datetime
+        - end_datetime
+
+    ComponentVerificationStatus:
+      type: object
+      properties:
+        aerobridge_id:
+          $ref: '#/components/schemas/AerobridgeID' 
+        status:
+          enum:
+          - 0
+          - 1          
+          type: integer
+          description: >
+            Specify if the Aerobridge ID is verified
+             * `0` - Not verfied
+             * `1` - Verified
+             
+    AerobridgeID: 
+      type: string
+      pattern: '^\w{3-10}-\w{3-10}-\w{3-15}$'
+      example: 'coypu-bullwhack-headman'
+      description: Aerobridge ID is a unique global identifier for this component assigned at the time custody is acknowledged
+
+    AircraftComponent:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUIDv4Format' 
+          readOnly: true
+        raw_log:
+          type: object
+          description: A JSON file from the drone that has the raw log. Once the log has been uploaded, it is recommended that the file be deleted from the RFM / SD card on the drone.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        operation:
+          type: string
+          format: uuid
+          example: 29ec06cb-c6fb-4578-aea6-56fa438f4f82
+          description: Specify the operation object that this log deals with
+
+      required:
+        - raw_log
+        - operation
+
+
+    FlightLog:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUIDv4Format' 
+          readOnly: true
+        raw_log:
+          type: object
+          description: A JSON file from the drone that has the raw log. Once the log has been uploaded, it is recommended that the file be deleted from the RFM / SD card on the drone.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        operation:
+          type: string
+          format: uuid
+          example: 29ec06cb-c6fb-4578-aea6-56fa438f4f82
+          description: Specify the operation object that this log deals with
+
+      required:
+        - raw_log
+        - operation
+
+    FlightPermissionStatus: 
+        type: string
+        enum:
+        - granted
+        - denied
+        - pending
+        
+        description: >
+          All different statuses of a permission object:
+            * `granted` - Permission has been succesfully granted
+            * `denied` - Permission could not be granted for this operation
+            * `pending` - Permission could not be granted for this operation at this time, please check again at a later time
+    Latitude:
+      description: >-
+        Degrees of latitude north of the equator, with reference to the WGS84
+        ellipsoid.
+      maximum: 90
+      exclusiveMaximum: false
+      minimum: -90
+      exclusiveMinimum: false
+      type: number
+      format: double
+      example: 34.123
+    Longitude:
+      description: >-
+        Degrees of longitude east of the Prime Meridian, with reference to the
+        WGS84 ellipsoid.
+      minimum: -180
+      exclusiveMaximum: false
+      maximum: 180
+      exclusiveMinimum: false
+      type: number
+      format: double
+      example: -118.456
+    Polygon:
+      description: >-
+        An enclosed area on the earth. The bounding edges of this polygon are
+        defined to be the shortest paths between connected vertices.  This
+        means, for instance, that the edge between two points both defined at a
+        particular latitude is not generally contained at that latitude. The
+        winding order must be interpreted as the order which produces the
+        smaller area. The path between two vertices is defined to be the
+        shortest possible path between those vertices. Edges may not cross.
+        Vertices may not be duplicated.  In particular, the final polygon vertex
+        must not be identical to the first vertex.
+      required:
+      - vertices
+      type: object
+      properties:
+        vertices:
+          minItems: 3
+          type: array
+          items:
+            $ref: '#/components/schemas/LatLngPoint'
+    LatLngPoint:
+      description: Point on the earth's surface.
+      required:
+      - lat
+      - lng
+      type: object
+      properties:
+        lng:
+          $ref: '#/components/schemas/Longitude'
+        lat:
+          $ref: '#/components/schemas/Latitude'
+
+
+    FlightPermissionGeoCage: 
+        type: array
+        description: >
+          A geocage polygon represented as a array of points of latitude longitude points. This will be loaded on to the vehicle by the Flight module.
+        items: 
+          $ref: '#/components/schemas/LatLngPoint'
+
+    FlightPermissionGranted:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUIDv4Format' 
+          readOnly: true
+        operation:
+          type: object
+          properties:
+            id:
+              $ref: '#/components/schemas/UUIDv4Format' 
+              readOnly: true
+            name:
+              type: string
+              description: Give a friendly name for this operation
+              maxLength: 140
+            type_of_operation:
+              enum:
+                - 0
+                - 1
+              type: integer
+              description:
+                At the moment, only VLOS and BVLOS operations are supported,
+                for other types of operations, please issue a pull-request
+            created_at:
+              type: string
+              format: date-time
+              readOnly: true
+            drone:
+              type: string
+              description: Pick the drone that will be used to fly this operation
+            flight_plan:
+              type: string
+              format: uuid
+            purpose:
+              type: string
+              description: To add additional categories, please add entries to the Activities table
+            pilot:
+              type: string
+              format: uuid
+          required:
+            - drone
+            - flight_plan
+            - pilot
+          readOnly: true
+        token:
+          type: object
+          description: JWT of a permission object
+          example: {"access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IjZWUE1sdkI0S2pldEpMWGs3Sm5qVG1CaS1ZVUd0NXFXN1M2eGRZNnYzMDgifQ.eyJpc3MiOiJodHRwczovL2lkLm9wZW5za2llcy5zaC8iLCJleHAiOjE2NDAwMDYwNDksImlhdCI6MTY0MDAwMjQ0OSwic3ViIjoiQXM5QUpseVd3d3lyZnFZV2lOQ0duVTUzcmFGUXBpRVV0RkFjUElzRkBjbGllbnRzIiwic2NvcGUiOiIiLCJ0eXAiOiJCZWFyZXIiLCJmbGlnaHRfcGxhbl9pZCI6IjEyODE4ZTg3LTRjOTYtNGU0Yy04YzYzLTgyYjhlMTJjM2I3MyIsImZsaWdodF9vcGVyYXRpb25faWQiOiIzNDA4YmNlOS1kYmFiLTQ2NjUtYWJmYy04ZWEwM2IwYWQ4NzEiLCJwbGFuX2ZpbGVfaGFzaCI6IjJlMjYyMTdkYTg2YjJiYzYwMTM3ODg0NDYyNTdjZmI1ZDU5MGM5ZGU2NDJhODE2YmJkNjhmMDNjOWQ2MDc0MGYifQ.q1Jv1TFvCC7Pto8k2FCuEI-iikI5asRLOMneTOdFng1_8xnjybEE0gLjEyxGmG0g-vmLgGYc5R5Lv3XecMyTXhpppD2wpZLXvI_jbTg0IkxzPMWBFLcSMW4ywxoWaa7JYbJK3nbYFpmzEKQi5kUiFV-BsT6pD0ABcBW34j104DPCduddWnVDGdRqZHSAU9za_sczfawM-UEjCADvOfm0JIbp9GJ5M0NN_87wtRO91pz6o8GFehlSX9Hqw1BQWVAj2fP8RZAAmcbx15qOS5LnwFWoH8MUUqRLin-1nlZNm5LWmb2BBqm7DMFEK3c8RUQnlHj9rSbw8adtpSKda-yvCb06GHxMg_ixUPHFI-vOWQaxrL0zwQP1RpMm0HYq06F0RWYRpqAhW3Hyz8qgv-55yHbVk8PBLtsvb146xP8orHVRMulWA_uWghtNIQew41cPDWqaukzycIwIe_WFjBvX01QRLWVDdJTGNQvmJ9qM4qK40jygJR40Z36nCrfyrp-iJYWk7Wf1szr9PGRQQ22-UYYXIBbk1qzu2jNMAxpCN8hvKVOnc_BsHj7Uy8y8YtA9CBAZAsUzltvNnRN88krsyvCeuJc40paFkok2Pr4J1NF4Fu680tzUzgdA8AW803A7p_LYXskkl4vVSR3WOe5zP44_FZMmD6bvQoEuq2iBrMo","expires_in": 3600,"token_type": "Bearer","scope": ""}
+        geo_cage: 
+          $ref: '#/components/schemas/FlightPermissionGeoCage' 
+
+        status_code:
+          $ref: '#/components/schemas/FlightPermissionStatus' 
+          example: granted
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+    FlightPermissionDenied:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUIDv4Format' 
+          readOnly: true
+        operation:
+          type: object
+          properties:
+            id:
+              $ref: '#/components/schemas/UUIDv4Format' 
+              readOnly: true
+            name:
+              type: string
+              description: Give a friendly name for this operation
+              maxLength: 140
+            type_of_operation:
+              enum:
+                - 0
+                - 1
+              type: integer
+              description:
+                At the moment, only VLOS and BVLOS operations are supported,
+                for other types of operations, please issue a pull-request
+            created_at:
+              type: string
+              format: date-time
+              readOnly: true
+            drone:
+              type: string
+              description: Pick the drone that will be used to fly this operation
+            flight_plan:
+              type: string
+            purpose:
+              type: string
+              description: To add additional categories, please add entries to the Activities table
+            pilot:
+              type: string
+          required:
+            - drone
+            - flight_plan
+            - pilot
+          readOnly: true
+        geo_cage: 
+          type: array
+          example: []
+        token:
+          type: object          
+          example: {}
+        status_code:
+          type: string
+          example: denied          
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true          
+
+    FlightPermissionPending:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUIDv4Format' 
+          readOnly: true
+        operation:
+          type: object
+          properties:
+            id:
+              $ref: '#/components/schemas/UUIDv4Format' 
+              readOnly: true
+            name:
+              type: string
+              description: Give a friendly name for this operation
+              maxLength: 140
+            type_of_operation:
+              enum:
+                - 0
+                - 1
+              type: integer
+              description:
+                At the moment, only VLOS and BVLOS operations are supported,
+                for other types of operations, please issue a pull-request
+            created_at:
+              type: string
+              format: date-time
+              readOnly: true
+            drone:
+              type: string
+              description: Pick the drone that will be used to fly this operation
+            flight_plan:
+              type: string
+            purpose:
+              type: string
+              description: To add additional categories, please add entries to the Activities table
+            pilot:
+              type: string
+          required:
+            - drone
+            - flight_plan
+            - pilot
+          readOnly: true
+        token:
+          type: object          
+          example: {}
+        geo_cage: 
+          type: array
+          example: []        
+        status_code:
+          type: string
+          example: pending
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true          
+
+    Aircraft:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        operator:
+          type: string
+          description: Associate a operator to this Aircraft
+        manufacturer:
+          type: string
+          description: Associate a manufacturer in the database to this aircraft
+        name:
+          type: string
+          description: 'Set the internal name of the aircraft e.g. F1 #2'
+          maxLength: 280
+        status:
+          enum:
+          - 0
+          - 1
+          type: integer
+          description: Set the status of this drone, if it is set as inactive, the
+            GCS might fail and flight plans might not be able to load on the drone
+        final_assembly:
+          type: string
+          description: Assign a aircraft assembly to this aircraft
+        photo:
+          type: string
+          format: uri
+          description: A URL of a photo of the drone
+          maxLength: 200
+          pattern: "^(?:[a-z0-9.+-]*)://(?:[^\\s:@/]+(?::[^\\s:@/]*)?@)?(?:(?:0|25[0-5]|2[0-4]\\\
+            d|1\\d?\\d?|[1-9]\\d?)(?:\\.(?:0|25[0-5]|2[0-4]\\d|1\\d?\\d?|[1-9]\\d?)){3}|\\\
+            [[0-9a-f:.]+\\]|([a-z\xA1-\uFFFF0-9](?:[a-z\xA1-\uFFFF0-9-]{0,61}[a-z\xA1\
+            -\uFFFF0-9])?(?:\\.(?!-)[a-z\xA1-\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\xA1\
+            -\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\.?|localhost))(?::\\d{1,5})?(?:[/?#][^\\\
+            s]*)?\\z"
+        flight_controller_id:
+          type: string
+          description: This is the Drone ID from the RFM, if there are spaces in the
+            ID, remove them
+          maxLength: 140
+      required:
+      - operator
+      - manufacturer
+      - name
+      - final_assembly
+      - flight_controller_id
+    SignedFlightLog:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUIDv4Format' 
+          readOnly: true
+        signed_log:
+          type: string
+          description: A signed flight log per the RPAS manuals.
+
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        raw_flight_log:
+          type: string
+      required:
+        - signed_log
+        - raw_flight_log
+
+    Manufacturer:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        full_name:
+          type: string
+          description: Full legal name of the manufacturing entity
+          maxLength: 140
+        common_name:
+          type: string
+          description: Common name for the manufacturer e.g. Skydio
+          maxLength: 140
+        address:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              readOnly: true
+            address_line_1:
+              type: string
+              maxLength: 140
+            address_line_2:
+              type: string
+              nullable: true
+              maxLength: 140
+            address_line_3:
+              type: string
+              nullable: true
+              maxLength: 140
+            postcode:
+              type: string
+              maxLength: 10
+            city:
+              type: string
+              description: Set a city for this address
+              maxLength: 140
+            country:
+              enum:
+              - IN
+              type: string
+            created_at:
+              type: string
+              format: date-time
+              readOnly: true
+            updated_at:
+              type: string
+              format: date-time
+              readOnly: true
+          required:
+          - address_line_1
+          - postcode
+          - city
+          readOnly: true
+        role:
+          type: string
+          description: e.g. Reseller, distributor, OEM etc.
+          maxLength: 140
+      required:
+      - full_name
+      - common_name
+      - role
+
+    GeoJSON:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - Polygon
+            - MultiPolygon
+            - LineString
+
+        coordinates:
+          type: array
+          items:
+            $ref: "#/components/schemas/Point2D"
+
+    Point2D:
+      type: array
+      maxItems: 2
+      minItems: 2
+      items:
+        type: number
+    
+    UUIDv4Format:
+      description: >-
+        String whose format matches a version-4 UUID according to RFC 4122.
+      maxLength: 36
+      minLength: 36
+      type: string
+      format: uuid
+      pattern: >-
+        ^[0-9a-fA-F]{8}\\-[0-9a-fA-F]{4}\\-4[0-9a-fA-F]{3}\\-[8-b][0-9a-fA-F]{3}\\-[0-9a-fA-F]{12}$
+      example: 03e5572a-f733-49af-bc14-8a18bd53ee39
